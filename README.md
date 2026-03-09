@@ -9,7 +9,7 @@
 ---
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/a05213b7-378a-4149-be9d-06c7617e6666" width="600" alt="스플래시 및 실행 화면">
+  <img src="https://github.com/user-attachments/assets/6c27dadf-6848-4d18-8c7a-bbf3bc6ddc2a" width="600" alt="스플래시 및 실행 화면">
 </p>
 
 ## 📖 소개 (Overview)
@@ -23,7 +23,7 @@
 - **오조작 방지:** 카운팅 실수 시 즉각적인 마이너스(-) 수정 및 초기화 기능을 제공합니다.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c0ef15d7-3744-4fe4-9e14-463cfb8e67e2" width="600" alt="메인 집계 화면"/>
+  <img src="https://github.com/user-attachments/assets/99598d07-794c-4c5c-9960-0017052e0868" width="600" alt="메인 집계 화면"/>
 </p>
 
 ### 2. 🕒 유연한 맞춤형 스케줄링
@@ -31,7 +31,7 @@
 - **스마트 자동 이동:** 설정한 운영 시간에 맞춰 1시간 단위로 슬롯이 자동 생성되며, 실제 시간에 따라 **현재 시간대가 자동으로 선택**됩니다.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/dccf6664-688c-481f-8101-db038d23a366" width="500" alt="요일별 운영시간 설정 창">
+  <img src="https://github.com/user-attachments/assets/b0b75d98-7f63-49fa-8094-dca8db51d766" width="500" alt="요일별 운영시간 설정 창">
 </p>
 
 ### 3. 📈 강력한 시각화 및 통계
@@ -40,8 +40,8 @@
 * **인터랙티브 툴팁:** 차트 마우스 오버 시 대상별 세부 수치를 명확하게 제공합니다.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/fff5543a-f9cb-40bb-bbbb-4da1cf5619aa" width="400" alt="통계 막대 차트 화면"/>
-  <img src="https://github.com/user-attachments/assets/c1cce70e-d3be-4ad6-b871-1d88ca494cc2" width="400" alt="통계 꺾은선 차트 화면"/>
+  <img src="https://github.com/user-attachments/assets/a5282568-0474-40c7-b50b-a2c5fd08a02a" width="400" alt="통계 막대 차트 화면"/>
+  <img src="https://github.com/user-attachments/assets/fc2bf07c-4f90-41d8-858d-6719c5b317d4" width="400" alt="통계 꺾은선 차트 화면"/>
 </p>
 
 ### 4. 📑 엑셀 리포트 자동 생성
@@ -49,7 +49,7 @@
 * 마스터 요약(연도별), 월별, 일별, 시간대별 상세 원본 시트가 자동 분리되어 즉시 보고용으로 사용할 수 있습니다.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/833861c4-264c-4dc2-9df6-172e700965a3" width="600" alt="엑셀 출력 결과물">
+  <img src="https://github.com/user-attachments/assets/54b84ff0-504e-468a-be74-d754b57b4b43" width="600" alt="엑셀 출력 결과물">
 </p>
 
 ### 5. 💻 데스크톱 환경 최적화
