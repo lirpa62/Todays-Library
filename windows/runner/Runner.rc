@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.libVisitorCounter" "\0"
-            VALUE "FileDescription", "library_visitor_counter" "\0"
+            VALUE "CompanyName", "Lirpa" "\0"
+            VALUE "FileDescription", "오늘의 도서관 (방문자 집계 프로그램)" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "library_visitor_counter" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.libVisitorCounter. All rights reserved." "\0"
-            VALUE "OriginalFilename", "library_visitor_counter.exe" "\0"
-            VALUE "ProductName", "library_visitor_counter" "\0"
+            VALUE "InternalName", "todays_library" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Lirpa" "\0"
+            VALUE "OriginalFilename", "todays_library.exe" "\0"
+            VALUE "ProductName", "오늘의 도서관" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
