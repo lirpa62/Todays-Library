@@ -1843,62 +1843,65 @@ class _ScheduleSettingsDialogState extends State<ScheduleSettingsDialog> {
       content: SizedBox(
         width: 430,
         child: SingleChildScrollView(
-            child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16.0),
-                child: Text('체크박스를 해제하면 해당 요일은 휴관일로 처리됩니다.',
-                    style: TextStyle(color: Colors.grey)),
-              ),
-              ...List.generate(7, (index) {
-                int day = index + 1;
-                bool isClosed = localHours[day]!['closed'] == 1;
+            child: Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+              child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 16.0),
+                  child: Text('체크박스를 해제하면 해당 요일은 휴관일로 처리됩니다.',
+                      style: TextStyle(color: Colors.grey)),
+                ),
+                ...List.generate(7, (index) {
+                  int day = index + 1;
+                  bool isClosed = localHours[day]!['closed'] == 1;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      SizedBox(width: 60,
-                          child: Text(weekdayNames[day]!, style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold))),
-                      Checkbox(
-                        value: !isClosed,
-                        activeColor: colorScheme.primary,
-                        mouseCursor: SystemMouseCursors.click,
-                        onChanged: (val) {
-                          setState(() {
-                            localHours[day]!['closed'] = (val == true) ? 0 : 1;
-                          });
-                        },
-                      ),
-                      const Text('운영'),
-                      const Spacer(),
-                      // 고정 크기의 SizedBox로 감싸서 전환 시 흔들림(Jitter)을 원천 차단합니다.
-                      SizedBox(
-                        width: 240, // [드롭다운(100) + ~ (30) + 드롭다운(100)] 넉넉히 계산
-                        height: 48, // 드롭다운 위젯의 높이와 일치시킵니다.
-                        child: !isClosed
-                            ? Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            _buildTimeDropdown(day, 'start'),
-                            const Padding(padding: EdgeInsets.symmetric(horizontal: 8.0), child: Text('~')),
-                            _buildTimeDropdown(day, 'end'),
-                          ],
-                        )
-                            : const Center(
-                            child: Text(
-                                '휴관일',
-                                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 15)
-                            )
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 60,
+                            child: Text(weekdayNames[day]!, style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold))),
+                        Checkbox(
+                          value: !isClosed,
+                          activeColor: colorScheme.primary,
+                          mouseCursor: SystemMouseCursors.click,
+                          onChanged: (val) {
+                            setState(() {
+                              localHours[day]!['closed'] = (val == true) ? 0 : 1;
+                            });
+                          },
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
+                        const Text('운영'),
+                        const Spacer(),
+                        // 고정 크기의 SizedBox로 감싸서 전환 시 흔들림(Jitter)을 원천 차단합니다.
+                        SizedBox(
+                          width: 240, // [드롭다운(100) + ~ (30) + 드롭다운(100)] 넉넉히 계산
+                          height: 48, // 드롭다운 위젯의 높이와 일치시킵니다.
+                          child: !isClosed
+                              ? Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              _buildTimeDropdown(day, 'start'),
+                              const Padding(padding: EdgeInsets.symmetric(horizontal: 8.0), child: Text('~')),
+                              _buildTimeDropdown(day, 'end'),
+                            ],
+                          )
+                              : const Center(
+                              child: Text(
+                                  '휴관일',
+                                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 15)
+                              )
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            )
           )
         )
       ),
