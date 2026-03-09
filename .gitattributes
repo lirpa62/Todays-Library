@@ -1,0 +1,6 @@
+# Git이 다운로드할 때 특정 파일들의 줄바꿈(Line Ending)을 강제로 LF(\n)로 고정합니다.
+# 이렇게 하면 윈도우 빌드 머신에서도 깨짐 현상이 발생하지 않습니다.
+
+*.txt text eol=lf
+*.md text eol=lf
+LICENSE text eol=lf
