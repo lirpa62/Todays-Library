@@ -293,6 +293,14 @@ class DatabaseHelper {
     return await db.query('records', orderBy: 'date ASC, time_slot ASC');
   }
 
+  // 공장 초기화 로직 (모든 데이터 영구 삭제)
+  Future<void> clearAllData() async {
+    final db = await instance.database;
+    await db.delete('records'); // 모든 방문자 기록 삭제
+    await db.delete('schedule'); // 스케줄 삭제
+    await _createScheduleTable(db); // 스케줄 테이블 기본값(10-20시)으로 다시 세팅
+  }
+
   // DB에 기록된 모든 연도를 중복 없이 가져오기
   Future<List<int>> getAvailableYears() async {
     final db = await instance.database;
@@ -690,6 +698,19 @@ class _CounterPageState extends State<CounterPage> {
     final colorScheme = Theme.of(context).colorScheme;
     final totals = _getTodayTotal();
 
+    // 콤팩트 모드용 직전 시간대 합계 계산
+    String? prevSlotLabel;
+    int prevTotal = 0;
+    int currentIndex = timeSlots.indexOf(selectedSlot);
+    if (currentIndex > 0) {
+      String pSlot = timeSlots[currentIndex - 1]; // 이전 슬롯 (예: "13:00 - 14:00")
+      int pAdult = todayData[pSlot]?['adult'] ?? 0;
+      int pChild = todayData[pSlot]?['child'] ?? 0;
+      int pInfant = todayData[pSlot]?['infant'] ?? 0;
+      prevTotal = pAdult + pChild + pInfant;
+      prevSlotLabel = '직전 시간대 [$pSlot]';
+    }
+
     return Row(
       children: [
         // 콤팩트 모드가 아닐 때만 왼쪽 시간대 영역 렌더링
@@ -782,6 +803,12 @@ class _CounterPageState extends State<CounterPage> {
                     // null이 아니면서, 현재 선택된 슬롯이 실제 시간과 일치할 때만 실시간 배지 표시
                     if (_getRealTimeSlot() != null && selectedSlot == _getRealTimeSlot())
                       const Badge(label: Text('실시간'), backgroundColor: Colors.red),
+                    // 콤팩트 모드일 때만 직전 시간대 힌트 표시
+                    if (widget.isCompactMode && prevSlotLabel != null)
+                      Text(
+                        '($prevSlotLabel : $prevTotal명)',
+                        style: TextStyle(fontSize: 15, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 32),
@@ -794,9 +821,30 @@ class _CounterPageState extends State<CounterPage> {
                 Align(
                   alignment: Alignment.bottomRight,
                   child: FilledButton.tonalIcon(
-                    onPressed: () => _resetCount('전체'),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('현재 시간대 전체 초기화'),
+                    style: FilledButton.styleFrom(backgroundColor: Colors.red.withAlpha(25)),
+                    onPressed: () async {
+                      bool? confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('초기화 확인', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                          content: const Text('현재 시간대의 방문자 기록(성인/아동/유아)을\n모두 0으로 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+                            FilledButton(
+                                style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('초기화')
+                            ),
+                          ],
+                        ),
+                      );
+                      // 팝업에서 '초기화'를 눌렀을 때만 실행
+                      if (confirm == true) {
+                        _resetCount('전체');
+                      }
+                    },
+                    icon: const Icon(Icons.refresh, color: Colors.redAccent),
+                    label: const Text('현재 시간대 전체 초기화', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                   ),
                 )
               ],
@@ -2071,6 +2119,62 @@ class _ScheduleSettingsDialogState extends State<ScheduleSettingsDialog> {
                           ),
                         );
                       }),
+                      // 공장 초기화 (Danger Zone)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16.0),
+                        child: Divider(height: 1),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('위험 구역 (Danger Zone)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                              const SizedBox(height: 4),
+                              Text('프로그램 삭제 전 데이터 영구 지우기', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                            ],
+                          ),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                              side: const BorderSide(color: Colors.redAccent),
+                            ),
+                            icon: const Icon(Icons.delete_forever),
+                            label: const Text('공장 초기화'),
+                            onPressed: () async {
+                              bool? confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('⚠️ 공장 초기화 경고', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                                  content: const Text(
+                                      '모든 방문자 기록과 운영 시간 설정이 영구적으로 삭제됩니다.\n'
+                                          'PC에서 앱을 완전히 지우기 전에만 사용하세요.\n\n'
+                                          '정말 초기화하시겠습니까? (완료 시 앱이 즉시 종료됩니다)'
+                                  ),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+                                      onPressed: () => Navigator.pop(context, true),
+                                      child: const Text('영구 삭제'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                // 1. DB 모든 데이터 날리기
+                                await DatabaseHelper.instance.clearAllData();
+                                // 2. 창 크기 등 SharedPreferences 설정 날리기
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.clear();
+                                // 3. 앱 강제 종료 (dart:io 패키지의 exit 함수)
+                                exit(0);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ],
                   )
               )
