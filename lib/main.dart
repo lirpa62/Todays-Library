@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -24,11 +25,21 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
 
     await windowManager.ensureInitialized();
-    WindowOptions windowOptions = const WindowOptions(
-      size: Size(800, 880),
-      minimumSize: Size(650, 650),
+
+    // 저장된 창 크기 불러오기 (처음 실행해서 값이 없으면 기본값 800, 700 세팅)
+    final prefs = await SharedPreferences.getInstance();
+    final double width = prefs.getDouble('window_width') ?? 800.0;
+    final double height = prefs.getDouble('window_height') ?? 700.0;
+
+    // 저장된 모드 불러오기 (없으면 일반 모드 false)
+    final bool isCompact = prefs.getBool('is_compact_mode') ?? false;
+
+    WindowOptions windowOptions = WindowOptions(
+      size: Size(width, height),
+      // 모드에 따라 최소 크기 제한을 다르게 설정하여 실행
+      minimumSize: isCompact ? const Size(400, 650) : const Size(650, 650),
       center: true,
-      title: '오늘의 도서관 (방문자 집계)',
+      title: '오늘의 도서관',
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
@@ -40,7 +51,7 @@ void main() async {
   await DatabaseHelper.instance.database;
   await LibrarySchedule.loadSchedule();
 
-  runApp(const LibraryCounterApp());
+  runApp(const TodaysLibraryApp());
 }
 
 void _registerAdditionalLicenses() {
@@ -72,8 +83,36 @@ void _registerLicenseFromAsset({
 // -----------------------------------------------------------------------------
 // 앱 메인 및 테마 설정
 // -----------------------------------------------------------------------------
-class LibraryCounterApp extends StatelessWidget {
-  const LibraryCounterApp({super.key});
+class TodaysLibraryApp extends StatefulWidget {
+  const TodaysLibraryApp({super.key});
+
+  @override
+  State<TodaysLibraryApp> createState() => _TodaysLibraryAppState();
+}
+
+class _TodaysLibraryAppState extends State<TodaysLibraryApp> with WindowListener {
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this); // 리스너 등록
+  }
+
+  @override
+  void dispose() {
+    windowManager.removeListener(this); // 리스너 해제
+    super.dispose();
+  }
+
+  // 창 크기가 조절될 때마다 자동으로 실행되는 함수
+  @override
+  void onWindowResized() async {
+    final size = await windowManager.getSize();
+    final prefs = await SharedPreferences.getInstance();
+
+    // 조절된 새로운 가로, 세로 값을 저장소에 덮어씁니다.
+    await prefs.setDouble('window_width', size.width);
+    await prefs.setDouble('window_height', size.height);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -278,6 +317,46 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool _isAlwaysOnTop = false; // 창 항상 위 고정 상태
   int _scheduleVersion = 0;
 
+  // 콤팩트 모드용 변수
+  bool _isCompactMode = false;
+  double _normalWidth = 800.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialMode(); // 초기 모드 불러오기 실행
+  }
+
+  // 저장된 모드 상태를 UI 변수에 반영
+  void _loadInitialMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isCompactMode = prefs.getBool('is_compact_mode') ?? false;
+    });
+  }
+
+  // 콤팩트 모드 토글 함수
+  void _toggleCompactMode() async {
+    Size currentSize = await windowManager.getSize();
+    final prefs = await SharedPreferences.getInstance(); // 저장소 인스턴스
+
+    if (!_isCompactMode) {
+      _normalWidth = currentSize.width; // 원래 가로 크기 기억
+      await windowManager.setMinimumSize(const Size(400, 650)); // 최소 너비 제한 해제
+      await windowManager.setSize(Size(400, currentSize.height)); // 창 축소
+    } else {
+      await windowManager.setSize(Size(_normalWidth, currentSize.height)); // 원래 크기로 복구
+      await windowManager.setMinimumSize(const Size(650, 650)); // 최소 너비 제한 복구
+    }
+
+    setState(() {
+      _isCompactMode = !_isCompactMode;
+    });
+
+    // 변경된 모드 상태를 즉시 저장
+    await prefs.setBool('is_compact_mode', _isCompactMode);
+  }
+
   void _toggleAlwaysOnTop() async {
     bool isTop = await windowManager.isAlwaysOnTop();
     await windowManager.setAlwaysOnTop(!isTop);
@@ -290,46 +369,64 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-            _selectedIndex == 0
-            ? '오늘의 도서관 (방문자 집계)'
-            : '오늘의 도서관 (방문자 통계)',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
+        // 콤팩트 모드일 때 타이틀 간소화
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: _isCompactMode
+              ? const Text('집계 모드', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
+              : Text(
+              _selectedIndex == 0
+                  ? '오늘의 도서관 (방문자 집계)'
+                  : '오늘의 도서관 (방문자 통계)',
+              style: const TextStyle(fontWeight: FontWeight.bold)),),
         backgroundColor: Theme.of(context).colorScheme.surface,
         scrolledUnderElevation: 0, // 스크롤 시 앱바 색상 변함 방지
         actions: [
-          // 1.상단 분할 버튼(SegmentedButton)으로 메뉴 구현
-          SegmentedButton<int>(
-            segments: const [
-              ButtonSegment<int>(
-                  value: 0,
-                  icon: Icon(Icons.touch_app),
-                  label: Text('방문자 집계')
-              ),
-              ButtonSegment<int>(
-                  value: 1,
-                  icon: Icon(Icons.bar_chart),
-                  label: Text('방문자 통계')
-              ),
-            ],
-            selected: {_selectedIndex},
-            onSelectionChanged: (Set<int> newSelection) async {
-              int newIndex = newSelection.first;
-              setState(() {
-                _selectedIndex = newIndex;
-              });
+          // 콤팩트 모드가 아닐 때만 탭(세그먼트 버튼) 표시
+          if (!_isCompactMode) ...[
+            // 상단 분할 버튼(SegmentedButton)으로 메뉴 구현
+            Flexible(child: SegmentedButton<int>(
+              segments: const [
+                ButtonSegment<int>(
+                    value: 0,
+                    icon: Icon(Icons.touch_app),
+                    label: Text('방문자 집계')
+                ),
+                ButtonSegment<int>(
+                    value: 1,
+                    icon: Icon(Icons.bar_chart),
+                    label: Text('방문자 통계')
+                ),
+              ],
+              selected: {_selectedIndex},
+              onSelectionChanged: (Set<int> newSelection) async {
+                int newIndex = newSelection.first;
+                setState(() {
+                  _selectedIndex = newIndex;
+                });
 
-              // 탭에 따라 윈도우 창 타이틀 동적 변경
-              if (newIndex == 0) {
-                await windowManager.setTitle('오늘의 도서관 (방문자 집계)');
-              } else {
-                await windowManager.setTitle('오늘의 도서관 (방문자 통계)');
-              }
-            },
-          ),
-          const SizedBox(width: 24), // 메뉴와 핀셋 사이 간격
+                // 탭에 따라 윈도우 창 타이틀 동적 변경
+                if (newIndex == 0) {
+                  await windowManager.setTitle('오늘의 도서관 (방문자 집계)');
+                } else {
+                  await windowManager.setTitle('오늘의 도서관 (방문자 통계)');
+                }
+              },
+            )),
+            const SizedBox(width: 24), // 메뉴와 핀셋 사이 간격
+          ],
+          // 콤팩트 모드 전환 버튼 (집계 화면에서만 표시)
+          if (_selectedIndex == 0)
+            Tooltip(
+              message: _isCompactMode ? '크게 보기' : '콤팩트 모드 (작게 보기)',
+              child: IconButton(
+                icon: Icon(_isCompactMode ? Icons.open_in_full : Icons.close_fullscreen),
+                onPressed: _toggleCompactMode,
+              ),
+            ),
 
-          // 2. 항상 위 고정 아이콘 (메뉴 버튼 우측에 위치)
+          // 항상 위 고정 아이콘 (메뉴 버튼 우측에 위치)
           Tooltip(
             message: _isAlwaysOnTop ? '항상 위 고정 해제' : '창을 항상 위에 고정',
             child: IconButton(
@@ -338,50 +435,58 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               onPressed: _toggleAlwaysOnTop,
             ),
           ),
-          // '운영 시간 설정' 버튼
-          Tooltip(
-            message: '요일별 운영 시간 설정',
-            child: IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: () async {
-                // 설정 팝업창 띄우기
-                await showDialog(
-                  context: context,
-                  builder: (context) => const ScheduleSettingsDialog(),
-                );
-                // 팝업이 닫히면 카운터 화면을 강제로 새로고침하여 변경된 시간표 적용
-                setState(() {
-                  _scheduleVersion++;
-                });
-              },
+          // 콤팩트 모드가 아닐 때만 설정/정보 버튼 표시
+          if (!_isCompactMode) ...[
+            // '운영 시간 설정' 버튼
+            Tooltip(
+              message: '요일별 운영 시간 설정',
+              child: IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () async {
+                  // 설정 팝업창 띄우기
+                  await showDialog(
+                    context: context,
+                    builder: (context) => const ScheduleSettingsDialog(),
+                  );
+                  // 팝업이 닫히면 카운터 화면을 강제로 새로고침하여 변경된 시간표 적용
+                  setState(() {
+                    _scheduleVersion++;
+                  });
+                },
+              ),
             ),
-          ),
-          // '앱 정보 및 라이선스' 버튼
-          Tooltip(
-            message: '앱 정보 및 오픈소스 라이선스',
-            child: IconButton(
-              icon: const Icon(Icons.info_outline),
-              onPressed: () {
-                showLicensePage(
-                  context: context,
-                  applicationName: '오늘의 도서관',
-                  applicationVersion: '1.0.0',
-                  applicationIcon: Padding(
-                    padding: const EdgeInsets.only(top: 24.0, bottom: 16.0),
-                    child: Image.asset('assets/icon/app_icon.png', width: 64, height: 64),
-                  ),
-                  applicationLegalese: 'Copyright (c) 2026. Lirpa',
-                );
-              },
+            // '앱 정보 및 라이선스' 버튼
+            Tooltip(
+              message: '앱 정보 및 오픈소스 라이선스',
+              child: IconButton(
+                icon: const Icon(Icons.info_outline),
+                onPressed: () {
+                  showLicensePage(
+                    context: context,
+                    applicationName: '오늘의 도서관',
+                    applicationVersion: '1.0.0',
+                    applicationIcon: Padding(
+                      padding: const EdgeInsets.only(top: 24.0, bottom: 16.0),
+                      child: Image.asset('assets/icon/app_icon.png', width: 64, height: 64),
+                    ),
+                    applicationLegalese: 'Copyright (c) 2026. Lirpa',
+                  );
+                },
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
+            const SizedBox(width: 16),
+          ] else ...[
+            const SizedBox(width: 8), // 콤팩트 모드일 때 약간의 우측 여백
+          ]
         ],
       ),
-      // 3. Row와 VerticalDivider 등을 모두 지우고 본문만 꽉 차게 배치
+      // Row와 VerticalDivider 등을 모두 지우고 본문만 꽉 차게 배치
       // ValueKey를 부여하여, 설정이 바뀌면 CounterPage가 완전히 새로 시작되도록 함
       body: _selectedIndex == 0
-          ? CounterPage(key: ValueKey('counter_$_scheduleVersion'))
+          ? CounterPage(
+          key: ValueKey('counter_$_scheduleVersion'),
+          isCompactMode: _isCompactMode
+      )
           : const StatisticsPage(),
     );
   }
@@ -444,7 +549,8 @@ class LibrarySchedule {
 // 카운터 화면
 // -----------------------------------------------------------------------------
 class CounterPage extends StatefulWidget {
-  const CounterPage({super.key});
+  final bool isCompactMode;
+  const CounterPage({super.key, this.isCompactMode = false});
 
   @override
   State<CounterPage> createState() => _CounterPageState();
@@ -574,88 +680,99 @@ class _CounterPageState extends State<CounterPage> {
           ],
         ),
       );
-      }
+    }
     if (todayData.isEmpty) return const Center(child: CircularProgressIndicator());
     final colorScheme = Theme.of(context).colorScheme;
     final totals = _getTodayTotal();
 
     return Row(
       children: [
-        SizedBox(
-          width: 150,
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  itemCount: timeSlots.length,
-                  itemBuilder: (context, index) {
-                    final slot = timeSlots[index];
-                    int total = (todayData[slot]?['adult'] ?? 0) + (todayData[slot]?['child'] ?? 0) + (todayData[slot]?['infant'] ?? 0);
-                    bool isSelected = selectedSlot == slot;
-                    return ListTile(
-                      title: Text(slot, style: TextStyle(fontSize: 15, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                      subtitle: Text('합계: $total명'),
-                      selected: isSelected,
-                      selectedTileColor: colorScheme.primary.withValues(alpha: 0.1),
-                      onTap: () => setState(() => selectedSlot = slot),
-                    );
-                  },
+        // 콤팩트 모드가 아닐 때만 왼쪽 시간대 영역 렌더링
+        if (!widget.isCompactMode) ...[
+          SizedBox(
+            width: 150,
+            child: Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: timeSlots.length,
+                    itemBuilder: (context, index) {
+                      final slot = timeSlots[index];
+                      int total = (todayData[slot]?['adult'] ?? 0) + (todayData[slot]?['child'] ?? 0) + (todayData[slot]?['infant'] ?? 0);
+                      bool isSelected = selectedSlot == slot;
+                      return ListTile(
+                        title: Text(slot, style: TextStyle(fontSize: 15, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                        subtitle: Text('합계: $total명'),
+                        selected: isSelected,
+                        selectedTileColor: colorScheme.primary.withValues(alpha: 0.1),
+                        onTap: () => setState(() => selectedSlot = slot),
+                      );
+                    },
+                  ),
                 ),
-              ),
-              // 좌측 하단 오늘 총 합계 표시
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  border: Border(top: BorderSide(color: Colors.grey.shade300)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('오늘 총 방문자', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    _smallTotalRow('성인', totals['adult']!, colorScheme.primary),
-                    _smallTotalRow('아동', totals['child']!, colorScheme.secondary),
-                    _smallTotalRow('유아', totals['infant']!, colorScheme.tertiary),
-                  ],
-                ),
-              )
-            ],
+                // 좌측 하단 오늘 총 합계 표시
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    border: Border(top: BorderSide(color: Colors.grey.shade300)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('오늘 총 방문자', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 8),
+                      _smallTotalRow('성인', totals['adult']!, colorScheme.primary),
+                      _smallTotalRow('아동', totals['child']!, colorScheme.secondary),
+                      _smallTotalRow('유아', totals['infant']!, colorScheme.tertiary),
+                    ],
+                  ),
+                )
+              ],
+            ),
           ),
-        ),
-        const VerticalDivider(width: 1),
+          const VerticalDivider(width: 1),
+        ],
+        // 오른쪽 메인 영역
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.all(32.0),
+            // 콤팩트 모드일 때는 여백을 줄여서 공간 확보 (32.0 -> 16.0)
+            padding: EdgeInsets.all(widget.isCompactMode ? 16.0 : 32.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 현재 날짜와 1초마다 업데이트되는 실시간 시계
-                StreamBuilder<DateTime>(
-                    stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
-                    builder: (context, snapshot) {
-                      final now = snapshot.data ?? DateTime.now();
-                      const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  // 현재 날짜와 1초마다 업데이트되는 실시간 시계
+                  child: StreamBuilder<DateTime>(
+                      stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
+                      builder: (context, snapshot) {
+                        final now = snapshot.data ?? DateTime.now();
+                        const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
 
-                      final dateStr = DateFormat('yyyy년 MM월 dd일').format(now);
-                      final weekStr = weekdays[now.weekday - 1];
-                      final timeStr = DateFormat('HH:mm:ss').format(now);
+                        final dateStr = DateFormat('yyyy년 MM월 dd일').format(now);
+                        final weekStr = weekdays[now.weekday - 1];
+                        final timeStr = DateFormat('HH:mm:ss').format(now);
 
-                      return Text(
-                        '$dateStr ($weekStr)  $timeStr',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2, // 숫자 간격을 살짝 넓혀서 깔끔하게
-                        ),
-                      );
-                    }
+                        return Text(
+                          '$dateStr ($weekStr)  $timeStr',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.2, // 숫자 간격을 살짝 넓혀서 깔끔하게
+                          ),
+                        );
+                      }
+                  ),
                 ),
                 const SizedBox(height: 8), // 시계와 시간대 사이의 간격
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12.0,
                   children: [
-                    Text('시간대: $selectedSlot', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                    Text('시간대: $selectedSlot', style: TextStyle(fontSize: widget.isCompactMode ? 22 : 28, fontWeight: FontWeight.bold)),
                     const SizedBox(width: 12),
                     // null이 아니면서, 현재 선택된 슬롯이 실제 시간과 일치할 때만 실시간 배지 표시
                     if (_getRealTimeSlot() != null && selectedSlot == _getRealTimeSlot())
@@ -699,31 +816,80 @@ class _CounterPageState extends State<CounterPage> {
   }
 
   Widget _buildCounterRow(String label, int count, Color brandColor) {
+    // 콤팩트 모드 여부에 따라 여백과 글씨 크기를 유동적으로 바꿉니다.
+    final bool isCompact = widget.isCompactMode;
+    final double horizontalPadding = isCompact ? 12.0 : 24.0;
+    final double labelFontSize = isCompact ? 20.0 : 24.0;
+    final double countFontSize = isCompact ? 32.0 : 40.0;
+    final double iconSize = isCompact ? 32.0 : 40.0;
+    final double numberBoxWidth = isCompact ? 60.0 : 90.0;
+    final double spacing = isCompact ? 8.0 : 24.0;
+
+    // 오른쪽 조작 영역을 미리 위젯 변수로 만들어 둡니다.
+    Widget rightControls = Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        IconButton(
+            icon: Icon(Icons.remove_circle_outline, size: iconSize),
+            color: brandColor.withValues(alpha: 0.7),
+            onPressed: () => _updateCount(label, -1)
+        ),
+        SizedBox(
+          width: numberBoxWidth,
+          child: Center(
+            child: Text(
+              '$count',
+              style: TextStyle(fontSize: countFontSize, fontWeight: FontWeight.bold, color: brandColor),
+              // 숫자가 너무 커질 경우를 대비해 콤팩트 모드에서만 말줄임표 처리
+              overflow: isCompact ? TextOverflow.ellipsis : null,
+            ),
+          ),
+        ),
+        IconButton(
+            icon: Icon(Icons.add_circle, size: iconSize),
+            color: brandColor,
+            onPressed: () => _updateCount(label, 1)
+        ),
+        SizedBox(width: spacing),
+        TextButton(
+            onPressed: () => _resetCount(label),
+            child: Text(
+              '초기화',
+              style: const TextStyle(color: Colors.grey),
+              overflow: isCompact ? TextOverflow.ellipsis : null,
+            )
+        )
+      ],
+    );
+
     return Card(
       elevation: 0,
       color: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.shade300)),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 15.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            // --- 1. 왼쪽 라벨 영역 ---
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(width: 20, height: 20, decoration: BoxDecoration(color: brandColor, shape: BoxShape.circle)),
                 const SizedBox(width: 12),
-                Text(label, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                Text(label, style: TextStyle(fontSize: labelFontSize, fontWeight: FontWeight.bold)),
               ],
             ),
-            Row(
-              children: [
-                IconButton(icon: const Icon(Icons.remove_circle_outline, size: 40), color: brandColor.withValues(alpha: 0.7), onPressed: () => _updateCount(label, -1)),
-                SizedBox(width: 90, child: Center(child: Text('$count', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: brandColor)))),
-                IconButton(icon: const Icon(Icons.add_circle, size: 44), color: brandColor, onPressed: () => _updateCount(label, 1)),
-                const SizedBox(width: 24),
-                TextButton(onPressed: () => _resetCount(label), child: const Text('초기화', style: TextStyle(color: Colors.grey)))
-              ],
-            )
+
+            // --- 2. 오른쪽 조작 영역 ---
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: rightControls,
+              ),
+            ),
           ],
         ),
       ),
@@ -1841,69 +2007,69 @@ class _ScheduleSettingsDialogState extends State<ScheduleSettingsDialog> {
       title: const Text(
           '요일별 운영 시간 설정', style: TextStyle(fontWeight: FontWeight.bold)),
       content: SizedBox(
-        width: 430,
-        child: SingleChildScrollView(
-            child: Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-              child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 16.0),
-                  child: Text('체크박스를 해제하면 해당 요일은 휴관일로 처리됩니다.',
-                      style: TextStyle(color: Colors.grey)),
-                ),
-                ...List.generate(7, (index) {
-                  int day = index + 1;
-                  bool isClosed = localHours[day]!['closed'] == 1;
+          width: 430,
+          child: SingleChildScrollView(
+              child: Padding(
+                  padding: const EdgeInsets.only(right: 16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 16.0),
+                        child: Text('체크박스를 해제하면 해당 요일은 휴관일로 처리됩니다.',
+                            style: TextStyle(color: Colors.grey)),
+                      ),
+                      ...List.generate(7, (index) {
+                        int day = index + 1;
+                        bool isClosed = localHours[day]!['closed'] == 1;
 
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Row(
-                      children: [
-                        SizedBox(width: 60,
-                            child: Text(weekdayNames[day]!, style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold))),
-                        Checkbox(
-                          value: !isClosed,
-                          activeColor: colorScheme.primary,
-                          mouseCursor: SystemMouseCursors.click,
-                          onChanged: (val) {
-                            setState(() {
-                              localHours[day]!['closed'] = (val == true) ? 0 : 1;
-                            });
-                          },
-                        ),
-                        const Text('운영'),
-                        const Spacer(),
-                        // 고정 크기의 SizedBox로 감싸서 전환 시 흔들림(Jitter)을 원천 차단합니다.
-                        SizedBox(
-                          width: 240, // [드롭다운(100) + ~ (30) + 드롭다운(100)] 넉넉히 계산
-                          height: 48, // 드롭다운 위젯의 높이와 일치시킵니다.
-                          child: !isClosed
-                              ? Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Row(
                             children: [
-                              _buildTimeDropdown(day, 'start'),
-                              const Padding(padding: EdgeInsets.symmetric(horizontal: 8.0), child: Text('~')),
-                              _buildTimeDropdown(day, 'end'),
+                              SizedBox(width: 60,
+                                  child: Text(weekdayNames[day]!, style: const TextStyle(
+                                      fontSize: 16, fontWeight: FontWeight.bold))),
+                              Checkbox(
+                                value: !isClosed,
+                                activeColor: colorScheme.primary,
+                                mouseCursor: SystemMouseCursors.click,
+                                onChanged: (val) {
+                                  setState(() {
+                                    localHours[day]!['closed'] = (val == true) ? 0 : 1;
+                                  });
+                                },
+                              ),
+                              const Text('운영'),
+                              const Spacer(),
+                              // 고정 크기의 SizedBox로 감싸서 전환 시 흔들림(Jitter)을 원천 차단합니다.
+                              SizedBox(
+                                width: 240, // [드롭다운(100) + ~ (30) + 드롭다운(100)] 넉넉히 계산
+                                height: 48, // 드롭다운 위젯의 높이와 일치시킵니다.
+                                child: !isClosed
+                                    ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    _buildTimeDropdown(day, 'start'),
+                                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8.0), child: Text('~')),
+                                    _buildTimeDropdown(day, 'end'),
+                                  ],
+                                )
+                                    : const Center(
+                                    child: Text(
+                                        '휴관일',
+                                        style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 15)
+                                    )
+                                ),
+                              ),
                             ],
-                          )
-                              : const Center(
-                              child: Text(
-                                  '휴관일',
-                                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 15)
-                              )
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            )
+                        );
+                      }),
+                    ],
+                  )
+              )
           )
-        )
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(),
@@ -2059,37 +2225,37 @@ class _CustomDropdownState<T> extends State<CustomDropdown<T>> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return CompositedTransformTarget(
-      link: _layerLink,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-        onTap: _toggleDropdown,
-        child: Container(
-          width: widget.width,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            border: Border.all(color: _isOpen ? colorScheme.primary : Colors.grey.shade300, width: 1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  widget.items[widget.value] ?? widget.hint ?? '',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-                  overflow: TextOverflow.ellipsis,
-                ),
+        link: _layerLink,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: _toggleDropdown,
+            child: Container(
+              width: widget.width,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                border: Border.all(color: _isOpen ? colorScheme.primary : Colors.grey.shade300, width: 1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              Icon(
-                _isOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
-                color: _isOpen ? colorScheme.primary : Colors.grey.shade600,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.items[widget.value] ?? widget.hint ?? '',
+                      style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    _isOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                    color: _isOpen ? colorScheme.primary : Colors.grey.shade600,
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ),)
+            ),
+          ),)
     );
   }
 }
@@ -2137,28 +2303,28 @@ class _CustomDropdownMenu<T> extends StatelessWidget {
             bool isSelected = key == selectedValue;
 
             return MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => onItemSelected(key),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  color: isSelected ? colorScheme.primary.withAlpha(10) : Colors.transparent,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        value,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isSelected ? colorScheme.primary : Colors.grey.shade800,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => onItemSelected(key),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    color: isSelected ? colorScheme.primary.withAlpha(10) : Colors.transparent,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          value,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isSelected ? colorScheme.primary : Colors.grey.shade800,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
                         ),
-                      ),
-                      if (isSelected) Icon(Icons.check, color: colorScheme.primary, size: 18),
-                    ],
+                        if (isSelected) Icon(Icons.check, color: colorScheme.primary, size: 18),
+                      ],
+                    ),
                   ),
-                ),
-              )
+                )
             );
           },
         ),
