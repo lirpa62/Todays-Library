@@ -751,6 +751,19 @@ class _CounterPageState extends State<CounterPage> {
                       _smallTotalRow('성인', totals['adult']!, colorScheme.primary),
                       _smallTotalRow('아동', totals['child']!, colorScheme.secondary),
                       _smallTotalRow('유아', totals['infant']!, colorScheme.tertiary),
+
+                      // 항목과 전체 합계를 구분하는 얇은 선
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Divider(height: 1, color: Colors.grey.shade300),
+                      ),
+
+                      // 전체 합계
+                      _smallTotalRow(
+                          '전체 합계',
+                          totals['adult']! + totals['child']! + totals['infant']!,
+                          Colors.black87
+                      ),
                     ],
                   ),
                 )
