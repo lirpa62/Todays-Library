@@ -866,17 +866,17 @@ class _CounterPageState extends State<CounterPage> {
                     if (widget.isCompactMode) ...[
                       // 콤팩트 모드: 좌우 화살표 네비게이션
                       IconButton(
-                        icon: const Icon(Icons.chevron_left, size: 32),
+                        icon: const Icon(Icons.chevron_left, size: 30),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                         // 이전 시간대로 이동
                         onPressed: canGoPrev ? () => setState(() => selectedSlot = timeSlots[currentIndex - 1]) : null,
                       ),
                       const SizedBox(width: 4),
-                      Text(selectedSlot, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      Text(selectedSlot, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                       const SizedBox(width: 4),
                       IconButton(
-                        icon: const Icon(Icons.chevron_right, size: 32),
+                        icon: const Icon(Icons.chevron_right, size: 30),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                         // 다음 시간대로 이동
@@ -903,7 +903,7 @@ class _CounterPageState extends State<CounterPage> {
                         FilledButton.tonalIcon(
                           style: FilledButton.styleFrom(
                             visualDensity: VisualDensity.compact, // 버튼을 날씬하게
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
                             minimumSize: const Size(0, 28), // 콤팩트 창에 맞게 높이 최소화
                           ),
                           icon: const Icon(Icons.my_location, size: 12),
@@ -922,7 +922,22 @@ class _CounterPageState extends State<CounterPage> {
                 Align(
                   alignment: Alignment.bottomRight,
                   child: FilledButton.tonalIcon(
-                    style: FilledButton.styleFrom(backgroundColor: Colors.red.withAlpha(25)),
+                    style: ButtonStyle(
+                      // 배경색 상태 관리
+                      backgroundColor: WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
+                        if (states.contains(WidgetState.hovered)) {
+                          return Colors.redAccent; // 마우스를 올렸을 때: 진한 빨간색 배경
+                        }
+                        return Colors.red.withAlpha(25); // 평소: 아주 연한 빨간색 배경
+                      }),
+                      // 글자와 아이콘 색상 상태 관리
+                      foregroundColor: WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
+                        if (states.contains(WidgetState.hovered)) {
+                          return Colors.white; // 마우스를 올렸을 때: 흰색 글씨
+                        }
+                        return Colors.redAccent; // 평소: 진한 빨간색 글씨
+                      }),
+                    ),
                     onPressed: () async {
                       bool? confirm = await showDialog<bool>(
                         context: context,
@@ -944,8 +959,8 @@ class _CounterPageState extends State<CounterPage> {
                         _resetCount('전체');
                       }
                     },
-                    icon: const Icon(Icons.refresh, color: Colors.redAccent),
-                    label: const Text('현재 시간대 전체 초기화', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('현재 시간대 전체 초기화', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 )
               ],
