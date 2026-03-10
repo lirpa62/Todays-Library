@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:excel/excel.dart' hide Border, TextSpan;
@@ -498,17 +499,34 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               message: '앱 정보 및 오픈소스 라이선스',
               child: IconButton(
                 icon: const Icon(Icons.info_outline),
-                onPressed: () {
-                  showLicensePage(
-                    context: context,
-                    applicationName: '오늘의 도서관',
-                    applicationVersion: '1.1.0',
-                    applicationIcon: Padding(
-                      padding: const EdgeInsets.only(top: 24.0, bottom: 16.0),
-                      child: Image.asset('assets/icon/app_icon.png', width: 64, height: 64),
-                    ),
-                    applicationLegalese: 'Copyright (c) 2026. Lirpa',
-                  );
+                onPressed: () async {
+                  try {
+                    // 1. pubspec.yaml에서 버전 정보를 비동기로 가져옵니다.
+                    final packageInfo = await PackageInfo.fromPlatform();
+
+                    // context 자체의 mounted를 체크
+                    if (!context.mounted) return;
+
+                    // 2. 라이선스 페이지를 띄웁니다.
+                    showLicensePage(
+                      context: context,
+                      applicationName: '오늘의 도서관',
+                      applicationVersion: 'v${packageInfo.version}',
+                      applicationIcon: Padding(
+                        padding: const EdgeInsets.only(top: 24.0, bottom: 16.0),
+                        child: Image.asset(
+                          'assets/icon/app_icon.png',
+                          width: 64,
+                          height: 64,
+                          // 만약 아이콘 파일이 없어서 에러가 난다면 여기서 멈출 수 있으므로 에러 처리를 추가
+                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.library_books, size: 64),
+                        ),
+                      ),
+                      applicationLegalese: 'Copyright (c) 2026. Lirpa',
+                    );
+                  } catch (e) {
+                    debugPrint('앱 정보 불러오기 실패: $e');
+                  }
                 },
               ),
             ),
