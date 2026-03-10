@@ -37,7 +37,7 @@ void main() async {
     WindowOptions windowOptions = WindowOptions(
       size: Size(width, height),
       // 모드에 따라 최소 크기 제한을 다르게 설정하여 실행
-      minimumSize: isCompact ? const Size(400, 550) : const Size(650, 650),
+      minimumSize: isCompact ? const Size(350, 500) : const Size(650, 650),
       center: true,
       title: '오늘의 도서관',
     );
@@ -329,7 +329,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool _isCompactMode = false;
   double _normalWidth = 800.0;
   double _normalHeight = 700.0;
-  double _compactHeight = 550.0;
+  double _compactHeight = 500.0;
 
   @override
   void initState() {
@@ -368,9 +368,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       await prefs.setBool('is_compact_mode', true);
 
       // 2) 그 다음 창 크기를 줄임
-      await windowManager.setMinimumSize(const Size(400, 550)); // 최소 너비 제한 해제
-      await windowManager.setSize(Size(400, _compactHeight)); // 창 축소
-      await prefs.setDouble('window_width', 400);
+      await windowManager.setMinimumSize(const Size(350, 500)); // 최소 너비 제한 해제
+      await windowManager.setSize(Size(350, _compactHeight)); // 창 축소
+      await prefs.setDouble('window_width', 350);
       await prefs.setDouble('window_height', _compactHeight);
     } else {
       // ── 콤팩트 → 기본: 창을 먼저 키운 뒤 UI를 전환합니다 ──
@@ -726,14 +726,17 @@ class _CounterPageState extends State<CounterPage> {
     // 콤팩트 모드용 직전 시간대 합계 계산
     String? prevSlotLabel;
     int prevTotal = 0;
+    int pAdult = 0;
+    int pChild = 0;
+    int pInfant = 0;
     int currentIndex = timeSlots.indexOf(selectedSlot);
     if (currentIndex > 0) {
       String pSlot = timeSlots[currentIndex - 1]; // 이전 슬롯 (예: "13:00 - 14:00")
-      int pAdult = todayData[pSlot]?['adult'] ?? 0;
-      int pChild = todayData[pSlot]?['child'] ?? 0;
-      int pInfant = todayData[pSlot]?['infant'] ?? 0;
+      pAdult = todayData[pSlot]?['adult'] ?? 0;
+      pChild = todayData[pSlot]?['child'] ?? 0;
+      pInfant = todayData[pSlot]?['infant'] ?? 0;
       prevTotal = pAdult + pChild + pInfant;
-      prevSlotLabel = '직전 시간대 [$pSlot]';
+      prevSlotLabel = '직전 [$pSlot]';
     }
 
     return Row(
@@ -800,8 +803,8 @@ class _CounterPageState extends State<CounterPage> {
         // 오른쪽 메인 영역
         Expanded(
           child: Padding(
-            // 콤팩트 모드일 때는 여백을 줄여서 공간 확보 (32.0 -> 16.0)
-            padding: EdgeInsets.all(widget.isCompactMode ? 16.0 : 32.0),
+            // 콤팩트 모드일 때는 여백을 줄여서 공간 확보 (32.0 -> 12.0)
+            padding: EdgeInsets.all(widget.isCompactMode ? 12.0 : 32.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -831,29 +834,29 @@ class _CounterPageState extends State<CounterPage> {
                       }
                   ),
                 ),
-                const SizedBox(height: 8), // 시계와 시간대 사이의 간격
+                SizedBox(height: widget.isCompactMode ? 5 : 8), // 시계와 시간대 사이의 간격
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12.0,
+                  spacing: 5.0,
                   children: [
                     Text('시간대: $selectedSlot', style: TextStyle(fontSize: widget.isCompactMode ? 22 : 28, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 5),
                     // null이 아니면서, 현재 선택된 슬롯이 실제 시간과 일치할 때만 실시간 배지 표시
                     if (_getRealTimeSlot() != null && selectedSlot == _getRealTimeSlot())
                       const Badge(label: Text('실시간'), backgroundColor: Colors.red),
                     // 콤팩트 모드일 때만 직전 시간대 힌트 표시
                     if (widget.isCompactMode && prevSlotLabel != null)
                       Text(
-                        '($prevSlotLabel : $prevTotal명)',
+                        '($prevSlotLabel : $pAdult명 / $pChild명 / $pInfant명)',
                         style: TextStyle(fontSize: 15, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
                       ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: widget.isCompactMode ? 8 : 16),
                 _buildCounterRow('성인', todayData[selectedSlot]!['adult']!, colorScheme.primary),
-                const SizedBox(height: 16),
+                SizedBox(height: widget.isCompactMode ? 4 : 16),
                 _buildCounterRow('아동', todayData[selectedSlot]!['child']!, colorScheme.secondary),
-                const SizedBox(height: 16),
+                SizedBox(height: widget.isCompactMode ? 4 : 16),
                 _buildCounterRow('유아', todayData[selectedSlot]!['infant']!, colorScheme.tertiary),
                 const Spacer(),
                 Align(
@@ -943,14 +946,14 @@ class _CounterPageState extends State<CounterPage> {
             onPressed: () => _updateCount(label, 1)
         ),
         SizedBox(width: spacing),
-        // ✨ 휴지통 아이콘 버튼 + 클릭 시 재확인 팝업 추가
+        // 휴지통 아이콘 버튼 + 클릭 시 재확인 팝업
         Tooltip(
           message: '$label 카운트 초기화',
           child: IconButton(
             icon: const Icon(Icons.delete_outline, size: 24),
             color: Colors.grey.shade400,
             onPressed: () async {
-              // ✨ 팝업 띄우기 로직 추가
+              // 팝업 띄우기 로직
               bool? confirm = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
@@ -981,7 +984,7 @@ class _CounterPageState extends State<CounterPage> {
       color: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.shade300)),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 15.0),
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 13.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
