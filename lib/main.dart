@@ -37,7 +37,7 @@ void main() async {
     WindowOptions windowOptions = WindowOptions(
       size: Size(width, height),
       // 모드에 따라 최소 크기 제한을 다르게 설정하여 실행
-      minimumSize: isCompact ? const Size(400, 650) : const Size(650, 650),
+      minimumSize: isCompact ? const Size(400, 550) : const Size(650, 650),
       center: true,
       title: '오늘의 도서관',
     );
@@ -328,6 +328,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   // 콤팩트 모드용 변수
   bool _isCompactMode = false;
   double _normalWidth = 800.0;
+  double _normalHeight = 700.0;
+  double _compactHeight = 550.0;
 
   @override
   void initState() {
@@ -341,6 +343,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     setState(() {
       _isCompactMode = prefs.getBool('is_compact_mode') ?? false;
       _normalWidth = prefs.getDouble('normal_width') ?? 800.0;
+      _normalHeight = prefs.getDouble('normal_height') ?? 700.0;
+      _compactHeight = prefs.getDouble('compact_height') ?? 580.0;
     });
   }
 
@@ -350,24 +354,45 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final prefs = await SharedPreferences.getInstance(); // 저장소 인스턴스
 
     if (!_isCompactMode) {
+      // ── 기본 → 콤팩트: UI를 먼저 전환한 뒤 창을 줄입니다 ──
+      // (창이 줄어드는 중간 프레임에서 기본 모드 레이아웃이 좁은 창에 그려지는 오버플로우 방지)
       _normalWidth = currentSize.width; // 원래 가로 크기 기억
+      _normalHeight = currentSize.height;
       await prefs.setDouble('normal_width', _normalWidth); // 기본 모드 너비를 영속 저장
-      await windowManager.setMinimumSize(const Size(400, 650)); // 최소 너비 제한 해제
-      await windowManager.setSize(Size(400, currentSize.height)); // 창 축소
-      // onWindowResized 콜백의 비동기 타이밍에 의존하지 않고 직접 저장
+      await prefs.setDouble('normal_height', _normalHeight);
+
+      // 1) UI 모드를 먼저 콤팩트로 전환 (콤팩트 레이아웃은 넓은 창에서도 문제없음)
+      setState(() {
+        _isCompactMode = true;
+      });
+      await prefs.setBool('is_compact_mode', true);
+
+      // 2) 그 다음 창 크기를 줄임
+      await windowManager.setMinimumSize(const Size(400, 550)); // 최소 너비 제한 해제
+      await windowManager.setSize(Size(400, _compactHeight)); // 창 축소
       await prefs.setDouble('window_width', 400);
+      await prefs.setDouble('window_height', _compactHeight);
     } else {
-      await windowManager.setSize(Size(_normalWidth, currentSize.height)); // 원래 크기로 복구
+      // ── 콤팩트 → 기본: 창을 먼저 키운 뒤 UI를 전환합니다 ──
+      // (좁은 창에서 기본 모드 레이아웃이 그려지는 오버플로우 방지)
+      _compactHeight = currentSize.height; // 콤팩트 모드일 때 사용자가 조절해둔 높이를 기억합니다.
+      await prefs.setDouble('compact_height', _compactHeight);
+
+      // 일반 모드 복구 시, 기억해둔 _normalHeight를 쓰되 최소 650으로 방어합니다.
+      double targetHeight = _normalHeight < 650 ? 650 : _normalHeight;
+
+      // 1) 창 크기를 먼저 키움 (콤팩트 레이아웃은 넓은 창에서도 문제없음)
       await windowManager.setMinimumSize(const Size(650, 650)); // 최소 너비 제한 복구
-      await prefs.setDouble('window_width', _normalWidth); // 직접 저장
+      await windowManager.setSize(Size(_normalWidth, targetHeight)); // 원래 크기로 복구
+      await prefs.setDouble('window_width', _normalWidth);
+      await prefs.setDouble('window_height', targetHeight);
+
+      // 2) 그 다음 UI 모드를 기본으로 전환
+      setState(() {
+        _isCompactMode = false;
+      });
+      await prefs.setBool('is_compact_mode', false);
     }
-
-    setState(() {
-      _isCompactMode = !_isCompactMode;
-    });
-
-    // 변경된 모드 상태를 즉시 저장
-    await prefs.setBool('is_compact_mode', _isCompactMode);
   }
 
   void _toggleAlwaysOnTop() async {
@@ -740,7 +765,7 @@ class _CounterPageState extends State<CounterPage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    color: Colors.white,
                     border: Border(top: BorderSide(color: Colors.grey.shade300)),
                   ),
                   child: Column(
@@ -824,7 +849,7 @@ class _CounterPageState extends State<CounterPage> {
                       ),
                   ],
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
                 _buildCounterRow('성인', todayData[selectedSlot]!['adult']!, colorScheme.primary),
                 const SizedBox(height: 16),
                 _buildCounterRow('아동', todayData[selectedSlot]!['child']!, colorScheme.secondary),
@@ -918,13 +943,35 @@ class _CounterPageState extends State<CounterPage> {
             onPressed: () => _updateCount(label, 1)
         ),
         SizedBox(width: spacing),
-        TextButton(
-            onPressed: () => _resetCount(label),
-            child: Text(
-              '초기화',
-              style: const TextStyle(color: Colors.grey),
-              overflow: isCompact ? TextOverflow.ellipsis : null,
-            )
+        // ✨ 휴지통 아이콘 버튼 + 클릭 시 재확인 팝업 추가
+        Tooltip(
+          message: '$label 카운트 초기화',
+          child: IconButton(
+            icon: const Icon(Icons.delete_outline, size: 24),
+            color: Colors.grey.shade400,
+            onPressed: () async {
+              // ✨ 팝업 띄우기 로직 추가
+              bool? confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('$label 초기화', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                  content: Text('현재 시간대의 [$label] 방문자 기록을\n0으로 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+                    FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('초기화')
+                    ),
+                  ],
+                ),
+              );
+              // 사용자가 '초기화'를 눌렀을 때만 실제 초기화 함수 실행
+              if (confirm == true) {
+                _resetCount(label);
+              }
+            },
+          ),
         )
       ],
     );
