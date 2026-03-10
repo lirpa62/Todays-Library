@@ -332,6 +332,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _isCompactMode = prefs.getBool('is_compact_mode') ?? false;
+      _normalWidth = prefs.getDouble('normal_width') ?? 800.0;
     });
   }
 
@@ -342,11 +343,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (!_isCompactMode) {
       _normalWidth = currentSize.width; // 원래 가로 크기 기억
+      await prefs.setDouble('normal_width', _normalWidth); // 기본 모드 너비를 영속 저장
       await windowManager.setMinimumSize(const Size(400, 650)); // 최소 너비 제한 해제
       await windowManager.setSize(Size(400, currentSize.height)); // 창 축소
+      // onWindowResized 콜백의 비동기 타이밍에 의존하지 않고 직접 저장
+      await prefs.setDouble('window_width', 400);
     } else {
       await windowManager.setSize(Size(_normalWidth, currentSize.height)); // 원래 크기로 복구
       await windowManager.setMinimumSize(const Size(650, 650)); // 최소 너비 제한 복구
+      await prefs.setDouble('window_width', _normalWidth); // 직접 저장
     }
 
     setState(() {
