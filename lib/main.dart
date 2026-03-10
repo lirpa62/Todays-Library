@@ -37,7 +37,7 @@ void main() async {
     WindowOptions windowOptions = WindowOptions(
       size: Size(width, height),
       // 모드에 따라 최소 크기 제한을 다르게 설정하여 실행
-      minimumSize: isCompact ? const Size(350, 500) : const Size(650, 650),
+      minimumSize: isCompact ? const Size(350, 470) : const Size(630, 650),
       center: true,
       title: '오늘의 도서관',
     );
@@ -329,7 +329,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool _isCompactMode = false;
   double _normalWidth = 800.0;
   double _normalHeight = 700.0;
-  double _compactHeight = 500.0;
+  double _compactHeight = 470.0;
 
   @override
   void initState() {
@@ -368,7 +368,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       await prefs.setBool('is_compact_mode', true);
 
       // 2) 그 다음 창 크기를 줄임
-      await windowManager.setMinimumSize(const Size(350, 500)); // 최소 너비 제한 해제
+      await windowManager.setMinimumSize(const Size(350, 470)); // 최소 너비 제한 해제
       await windowManager.setSize(Size(350, _compactHeight)); // 창 축소
       await prefs.setDouble('window_width', 350);
       await prefs.setDouble('window_height', _compactHeight);
@@ -378,11 +378,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       _compactHeight = currentSize.height; // 콤팩트 모드일 때 사용자가 조절해둔 높이를 기억합니다.
       await prefs.setDouble('compact_height', _compactHeight);
 
-      // 일반 모드 복구 시, 기억해둔 _normalHeight를 쓰되 최소 650으로 방어합니다.
-      double targetHeight = _normalHeight < 650 ? 650 : _normalHeight;
+      // 일반 모드 복구 시, 기억해둔 _normalHeight를 쓰되 최소 630으로 방어합니다.
+      double targetHeight = _normalHeight < 630 ? 630 : _normalHeight;
 
       // 1) 창 크기를 먼저 키움 (콤팩트 레이아웃은 넓은 창에서도 문제없음)
-      await windowManager.setMinimumSize(const Size(650, 650)); // 최소 너비 제한 복구
+      await windowManager.setMinimumSize(const Size(630, 650)); // 최소 너비 제한 복구
       await windowManager.setSize(Size(_normalWidth, targetHeight)); // 원래 크기로 복구
       await prefs.setDouble('window_width', _normalWidth);
       await prefs.setDouble('window_height', targetHeight);
@@ -502,7 +502,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   showLicensePage(
                     context: context,
                     applicationName: '오늘의 도서관',
-                    applicationVersion: '1.0.0',
+                    applicationVersion: '1.1.0',
                     applicationIcon: Padding(
                       padding: const EdgeInsets.only(top: 24.0, bottom: 16.0),
                       child: Image.asset('assets/icon/app_icon.png', width: 64, height: 64),
@@ -723,21 +723,13 @@ class _CounterPageState extends State<CounterPage> {
     final colorScheme = Theme.of(context).colorScheme;
     final totals = _getTodayTotal();
 
-    // 콤팩트 모드용 직전 시간대 합계 계산
-    String? prevSlotLabel;
-    int prevTotal = 0;
-    int pAdult = 0;
-    int pChild = 0;
-    int pInfant = 0;
+    // 현재 시간대의 인덱스를 찾아 이전/다음 이동 가능 여부를 판단합니다.
     int currentIndex = timeSlots.indexOf(selectedSlot);
-    if (currentIndex > 0) {
-      String pSlot = timeSlots[currentIndex - 1]; // 이전 슬롯 (예: "13:00 - 14:00")
-      pAdult = todayData[pSlot]?['adult'] ?? 0;
-      pChild = todayData[pSlot]?['child'] ?? 0;
-      pInfant = todayData[pSlot]?['infant'] ?? 0;
-      prevTotal = pAdult + pChild + pInfant;
-      prevSlotLabel = '직전 [$pSlot]';
-    }
+    bool canGoPrev = currentIndex > 0;
+    bool canGoNext = currentIndex < timeSlots.length - 1;
+
+    // 현재 도서관의 실제 운영 시간대 문자열을 미리 가져옵니다.
+    String? realTimeSlot = _getRealTimeSlot();
 
     return Row(
       children: [
@@ -822,34 +814,84 @@ class _CounterPageState extends State<CounterPage> {
                         final weekStr = weekdays[now.weekday - 1];
                         final timeStr = DateFormat('HH:mm:ss').format(now);
 
-                        return Text(
-                          '$dateStr ($weekStr)  $timeStr',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.2, // 숫자 간격을 살짝 넓혀서 깔끔하게
-                          ),
+                        return Row(
+                            children: [
+                              Text(
+                                '$dateStr ($weekStr)',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1.2, // 숫자 간격을 살짝 넓혀서 깔끔하게
+                                ),
+                              ),
+                              Text(
+                                '  $timeStr',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  color: Color(0xFFE59F4A),
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1.2, // 숫자 간격을 살짝 넓혀서 깔끔하게
+                                ),
+                              )
+                            ]
                         );
                       }
                   ),
                 ),
                 SizedBox(height: widget.isCompactMode ? 5 : 8), // 시계와 시간대 사이의 간격
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 5.0,
+
+                // 시간대 표시 및 네비게이션 영역
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text('시간대: $selectedSlot', style: TextStyle(fontSize: widget.isCompactMode ? 22 : 28, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 5),
-                    // null이 아니면서, 현재 선택된 슬롯이 실제 시간과 일치할 때만 실시간 배지 표시
-                    if (_getRealTimeSlot() != null && selectedSlot == _getRealTimeSlot())
-                      const Badge(label: Text('실시간'), backgroundColor: Colors.red),
-                    // 콤팩트 모드일 때만 직전 시간대 힌트 표시
-                    if (widget.isCompactMode && prevSlotLabel != null)
-                      Text(
-                        '($prevSlotLabel : $pAdult명 / $pChild명 / $pInfant명)',
-                        style: TextStyle(fontSize: 15, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                    if (widget.isCompactMode) ...[
+                      // 콤팩트 모드: 좌우 화살표 네비게이션
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left, size: 32),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        // 이전 시간대로 이동
+                        onPressed: canGoPrev ? () => setState(() => selectedSlot = timeSlots[currentIndex - 1]) : null,
                       ),
+                      const SizedBox(width: 4),
+                      Text(selectedSlot, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right, size: 32),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        // 다음 시간대로 이동
+                        onPressed: canGoNext ? () => setState(() => selectedSlot = timeSlots[currentIndex + 1]) : null,
+                      ),
+                    ] else ...[
+                      // 기본 모드: 기존 텍스트 유지
+                      Text('시간대: $selectedSlot', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                    ],
+
+                    const SizedBox(width: 5),
+
+                    // 실시간 배지 및 복귀 버튼 처리
+                    if (realTimeSlot != null)
+                      if (selectedSlot == realTimeSlot)
+                      // 현재 시간대일 때는 기존처럼 빨간색 '실시간' 배지 표시
+                        const Badge(
+                            label: Text('실시간', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            backgroundColor: Colors.red,
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        )
+                      else
+                      // 다른 시간대일 때는 '실시간 복귀' 버튼 표시
+                        FilledButton.tonalIcon(
+                          style: FilledButton.styleFrom(
+                            visualDensity: VisualDensity.compact, // 버튼을 날씬하게
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                            minimumSize: const Size(0, 28), // 콤팩트 창에 맞게 높이 최소화
+                          ),
+                          icon: const Icon(Icons.my_location, size: 12),
+                          label: const Text('현재 시간대', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: () => setState(() => selectedSlot = realTimeSlot), // 클릭 시 즉시 복귀
+                        ),
                   ],
                 ),
                 SizedBox(height: widget.isCompactMode ? 8 : 16),
