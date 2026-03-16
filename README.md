@@ -9,8 +9,7 @@
 
 ---
 
-
-<img src="https://github.com/user-attachments/assets/dfc5884e-bce8-4df5-835a-a927e29e9a03" width="600" alt="스플래시 및 실행 화면">
+![스플래시 및 실행 화면](assets/screenshots/splash.gif)
 
 ## 📖 소개 (Overview)
 '오늘의 도서관'은 도서관 현장 사서분들의 실무 편의성을 위해 개발된 **데스크톱(Windows) 전용 방문자 카운팅 애플리케이션**입니다.
@@ -22,34 +21,34 @@
 - **초소형 위젯 모드:** 타 업무 프로그램(도서 대출/반납, 엑셀 등)과 화면을 함께 쓸 수 있도록 최소 **350x500px**까지 축소되는 '콤팩트 모드'를 지원합니다.
 - **스마트 네비게이션:** 좁은 콤팩트 창 안에서도 **좌우 화살표**를 통해 다른 시간대 기록을 조회/수정할 수 있으며, **'현재 시간대'** 버튼으로 언제든 실시간 운영 시간대로 즉시 스냅(Snap) 복귀할 수 있습니다.
 
-<img src="https://github.com/user-attachments/assets/a0640a70-73a0-4352-965f-c13fe07c2afd" width="400" alt="콤팩트 모드 화면"/>
+![콤팩트 모드 화면](assets/screenshots/compact_mode.png)
 
 ### 2. 📊 직관적이고 안전한 실시간 방문자 집계
 - **대상별 카운팅:** 성인, 아동, 유아를 구분하여 원클릭으로 집계하며, 좌측 패널에서 대상별 수치와 **당일 전체 누적 합계**를 한눈에 확인할 수 있습니다.
 - **오조작(휴먼 에러) 원천 차단:** 모든 개별/전체 초기화(휴지통) 버튼 클릭 시 **재확인(경고) 팝업**을 띄우고, 마우스 호버(Hover) 시 붉은색 반전 효과를 주어 소중한 데이터 유실을 방지합니다.
 
-<img src="https://github.com/user-attachments/assets/99598d07-794c-4c5c-9960-0017052e0868" width="600" alt="메인 집계 화면"/>
+![메인 집계 화면](assets/screenshots/main_counter.png)
 
 ### 3. 🕒 유연한 맞춤형 스케줄링
 - **맞춤형 운영 시간:** 도서관의 실제 운영 시간(최대 00:00 ~ 24:00)과 휴관일을 요일별로 자유롭게 커스텀할 수 있습니다.
 - **스마트 자동 이동:** 설정한 운영 시간에 맞춰 1시간 단위로 슬롯이 자동 생성되며, 실제 시간에 따라 **현재 시간대가 자동으로 선택**됩니다.
 
-<img src="https://github.com/user-attachments/assets/b0b75d98-7f63-49fa-8094-dca8db51d766" width="500" alt="요일별 운영시간 설정 창">
+![요일별 운영시간 설정 창](assets/screenshots/schedule_settings.png)
 
 ### 4. 📈시각화 및 통계
 * **다양한 기준의 통계:** 일별, 월별, 연도별, 전체 누적 통계를 지원합니다.
 * **동적 차트 제공:** 데이터의 성격에 따라 누적 막대 그래프와 꺾은선 그래프(개별 트렌드)를 스위칭하여 분석할 수 있습니다.
 * **인터랙티브 툴팁:** 차트 마우스 오버 시 대상별 세부 수치를 명확하게 제공합니다.
 
-
-<img src="https://github.com/user-attachments/assets/a5282568-0474-40c7-b50b-a2c5fd08a02a" width="400" alt="통계 막대 차트 화면"/>
-<img src="https://github.com/user-attachments/assets/fc2bf07c-4f90-41d8-858d-6719c5b317d4" width="400" alt="통계 꺾은선 차트 화면"/>
+| 막대 그래프 차트 | 꺾은선 그래프 차트 |
+| :---: | :---: |
+| ![통계 막대 차트 화면](assets/screenshots/stats_bar.png) | ![통계 꺾은선 차트 화면](assets/screenshots/stats_line.png) |
 
 ### 5. 📑 엑셀 리포트 자동 생성
 * 버튼 한 번으로 바탕화면에 **`.xlsx` 통계 보고서가 다운로드**됩니다.(교차 배경색, 맑은 고딕, 헤더 강조, 셀 너비 자동 맞춤 등 서식 자동 적용)
 * 마스터 요약(연도별), 월별, 일별, 시간대별 상세 원본 시트가 자동 분리되어 즉시 보고용으로 사용할 수 있습니다.
 
-<img src="https://github.com/user-attachments/assets/54b84ff0-504e-468a-be74-d754b57b4b43" width="600" alt="엑셀 출력 결과물">
+![엑셀 출력 결과물](assets/screenshots/excel_export.png)
 
 ### 6. 💻 데스크톱 환경 최적화
 * **독립적 창 크기 영구 기억:** 앱을 재실행해도 위치가 유지되며, 특히 '일반 모드'와 '콤팩트 모드' 각각의 창 크기를 독립적으로 기억하여(`shared_preferences` 활용) 완벽한 개인화 환경을 제공합니다.
