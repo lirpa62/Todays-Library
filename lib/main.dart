@@ -32,17 +32,32 @@ void main() async {
     final double width = prefs.getDouble('window_width') ?? 800.0;
     final double height = prefs.getDouble('window_height') ?? 700.0;
 
+    //저장된 창 위치(X, Y 좌표) 불러오기
+    final double? x = prefs.getDouble('window_x');
+    final double? y = prefs.getDouble('window_y');
+
     // 저장된 모드 불러오기 (없으면 일반 모드 false)
     final bool isCompact = prefs.getBool('is_compact_mode') ?? false;
+
+    // X, Y 좌표가 있으면 Offset 객체로 만듭니다.
+    Offset? initialPosition;
+    if (x != null && y != null) {
+      initialPosition = Offset(x, y);
+    }
 
     WindowOptions windowOptions = WindowOptions(
       size: Size(width, height),
       // 모드에 따라 최소 크기 제한을 다르게 설정하여 실행
       minimumSize: isCompact ? const Size(350, 470) : const Size(630, 650),
-      center: true,
+      center: initialPosition == null, //  저장된 위치가 없을 때(최초 실행)만 화면 중앙에 배치
       title: '오늘의 도서관',
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
+      // 창을 화면에 보여주기 직전에, 저장된 위치가 있다면 그곳으로 이동
+      if (initialPosition != null) {
+        await windowManager.setPosition(initialPosition);
+      }
+
       await windowManager.show();
       await windowManager.focus();
     });
@@ -113,6 +128,17 @@ class _TodaysLibraryAppState extends State<TodaysLibraryApp> with WindowListener
     // 조절된 새로운 가로, 세로 값을 저장소에 덮어씁니다.
     await prefs.setDouble('window_width', size.width);
     await prefs.setDouble('window_height', size.height);
+  }
+
+  // 창의 위치가 이동될 때마다 자동으로 실행되는 함수
+  @override
+  void onWindowMoved() async {
+    final position = await windowManager.getPosition();
+    final prefs = await SharedPreferences.getInstance();
+
+    // 이동된 창의 X, Y 좌표를 저장소에 덮어씁니다.
+    await prefs.setDouble('window_x', position.dx);
+    await prefs.setDouble('window_y', position.dy);
   }
 
   @override
